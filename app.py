@@ -9,7 +9,8 @@ from openai import OpenAI
 load_dotenv()
 
 st.set_page_config(page_title="SuperBrain AI", layout="wide")
-
+# Load logo (must be inside repo)
+st.image("Super Brain.png", width=160)
 # ---------- Display Logo ----------
 # Make sure the file "Super Brain.png" is uploaded to the same folder as app.py
 st.markdown(
@@ -304,5 +305,6 @@ elif mode == "Code Helper":
     if st.button("Explain Code"):
         output = call_openai("You are senior developer.", f"Explain this code:\n{code_text}")
         st.write(output)
+
 
 
