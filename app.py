@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -8,18 +9,30 @@ from openai import OpenAI
 load_dotenv()
 
 st.set_page_config(page_title="SuperBrain AI", layout="wide")
-st.image("/mnt/data/Super Brain.png", width=160)
+
+# ---------- Display Logo ----------
+# Make sure the file "Super Brain.png" is uploaded to the same folder as app.py
+st.markdown(
+    """
+    <div style="text-align:center; margin-bottom: -20px;">
+        <img src="Super Brain.png" width="160">
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
 api_key = os.getenv("OPENAI_API_KEY", "")
 
-# ---------- Error if no API key ----------
 if not api_key:
     st.error(
-        "❌ No OpenAI API key found.\n\n"
-        "Set **OPENAI_API_KEY** in your `.env` file (local) or Streamlit Cloud Secrets."
+        "No OpenAI API key found.\n\n"
+        "Set OPENAI_API_KEY in your .env file (for local) "
+        "or in Streamlit Cloud Secrets (for deployed app)."
     )
     st.stop()
 
 client = OpenAI(api_key=api_key)
+
 
 # ---------- Billing / plan settings ----------
 APP_NAME = "SuperBrain AI"
@@ -291,4 +304,5 @@ elif mode == "Code Helper":
     if st.button("Explain Code"):
         output = call_openai("You are senior developer.", f"Explain this code:\n{code_text}")
         st.write(output)
+
 
