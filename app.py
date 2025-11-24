@@ -5,40 +5,43 @@ import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 
-# ---------- Load environment variables ----------
+# ---------------------------------------------------
+# Load environment variables
+# ---------------------------------------------------
 load_dotenv()
 
 st.set_page_config(page_title="SuperBrain AI", layout="wide")
 
-# ---------- Display Logo (Correct & Only One) ----------
-# Make sure "Super Brain.png" is in same folder as app.py
-st.markdown(
-    """
-    <div style="text-align:center; margin-top:10px; margin-bottom:5px;">
-        <img src="Super Brain.png" width="160">
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+# ---------------------------------------------------
+# Brand Logo (MUST exist in the repo)
+# ---------------------------------------------------
+# Put "SuperBrain.png" in the SAME folder as app.py
+st.image("SuperBrain.png", width=160)
 
+# ---------------------------------------------------
+# OpenAI API Setup
+# ---------------------------------------------------
 api_key = os.getenv("OPENAI_API_KEY", "")
 
 if not api_key:
     st.error(
-        "No OpenAI API key found.\n\n"
-        "Set OPENAI_API_KEY in your .env file (local) or in Streamlit Secrets (cloud)."
+        "🚨 No OpenAI API key found.\n\n"
+        "Add `OPENAI_API_KEY` to your `.env` (local) or Streamlit Secrets (deployed)."
     )
     st.stop()
 
 client = OpenAI(api_key=api_key)
 
-
-# ---------- Billing / plan settings ----------
+# ---------------------------------------------------
+# Billing / plan settings
+# ---------------------------------------------------
 APP_NAME = "SuperBrain AI"
 FREE_DAILY_LIMIT = int(os.getenv("FREE_DAILY_LIMIT", 5))
 PREMIUM_ACCESS_CODE = os.getenv("PREMIUM_ACCESS_CODE", "")
 
-# ---------- Session state ----------
+# ---------------------------------------------------
+# Session State
+# ---------------------------------------------------
 if "request_count" not in st.session_state:
     st.session_state.request_count = 0
 
@@ -51,53 +54,17 @@ if "chat_history" not in st.session_state:
 if "premium_activated_at" not in st.session_state:
     st.session_state.premium_activated_at = None
 
-# ============================
-# PREMIUM BANNER (NO IMAGES)
-# ============================
-if st.session_state.is_premium:
-    st.markdown(
-        """
-        <div style="text-align:center; 
-                    background:#4f46e5; 
-                    color:#fff;
-                    padding:6px 14px;
-                    border-radius:10px;
-                    width:200px;
-                    margin:auto;
-                    margin-bottom:15px;">
-            ✨ Premium User — Unlimited Access
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-else:
-    st.markdown(
-        """
-        <div style="text-align:center; 
-                    background:#f59e0b; 
-                    color:#fff;
-                    padding:6px 14px;
-                    border-radius:10px;
-                    width:230px;
-                    margin:auto;
-                    margin-bottom:15px;">
-            ⚡ Free User — Limited Access
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-# --------------------------------
+# ---------------------------------------------------
 # Helper Functions
-# --------------------------------
+# ---------------------------------------------------
 def can_use_ai():
     if st.session_state.is_premium:
         return True
 
     if st.session_state.request_count >= FREE_DAILY_LIMIT:
         st.warning(
-            f"Free limit reached ({FREE_DAILY_LIMIT} requests). Upgrade to Premium."
+            f"⚠️ Free limit reached ({FREE_DAILY_LIMIT} requests).\n"
+            "Upgrade to premium for **unlimited access**."
         )
         return False
 
@@ -125,170 +92,179 @@ def call_openai(system_prompt, user_prompt):
         return response.choices[0].message.content
 
     except Exception as e:
-        return f"❌ Error: {e}"
+        return f"❌ OpenAI Error: {e}"
 
 
-# ============================
-# SIDEBAR UI
-# ============================
+# ---------------------------------------------------
+# Sidebar UI
+# ---------------------------------------------------
 st.sidebar.title(APP_NAME)
 
-theme = st.sidebar.selectbox("Theme", ["Light", "Dark"])
+theme = st.sidebar.selectbox("Theme", ["Light", "Dark"], index=0)
 if theme == "Dark":
     st.markdown(
         """
-        <style>.stApp { background-color:#0D1117; color:#E6EDF3; }</style>
+        <style>
+            .stApp { background-color: #0D1117; color: #E6EDF3; }
+        </style>
         """,
         unsafe_allow_html=True,
     )
 
 mode = st.sidebar.selectbox(
     "Choose AI Tool:",
-    [
-        "General Chat",
-        "Resume & Cover Letter",
-        "Blog / Social Post Writer",
-        "Email Writer",
-        "Code Helper",
-    ],
+    ["General Chat", "Resume & Cover Letter", "Blog Writer", "Email Writer", "Code Helper"],
 )
 
-# Usage Panel
 st.sidebar.subheader("Usage")
+
 remaining = (
     "Unlimited"
     if st.session_state.is_premium
     else FREE_DAILY_LIMIT - st.session_state.request_count
 )
-st.sidebar.write(f"Used: {st.session_state.request_count}")
+
+st.sidebar.write(f"Requests Used: {st.session_state.request_count}")
 st.sidebar.write(f"Remaining: {remaining}")
 
 if not st.session_state.is_premium:
     st.sidebar.progress(st.session_state.request_count / FREE_DAILY_LIMIT)
 
-# Premium unlock
+# ---------------------------------------------------
+# Premium Unlock Section
+# ---------------------------------------------------
 st.sidebar.subheader("🔑 Have a Premium Code?")
-code_in = st.sidebar.text_input("Enter Access Code", type="password")
+code_input = st.sidebar.text_input("Enter Code", type="password")
+
 if st.sidebar.button("Unlock Premium"):
-    if code_in == PREMIUM_ACCESS_CODE:
+    if code_input == PREMIUM_ACCESS_CODE:
         st.session_state.is_premium = True
         st.session_state.request_count = 0
-        st.success("🎉 Premium Unlocked!")
+        st.success("🎉 Premium Unlocked — Enjoy Unlimited Access!")
     else:
-        st.error("❌ Wrong code")
+        st.error("❌ Incorrect Code.")
 
 st.sidebar.write("---")
-
 st.sidebar.subheader("💳 Upgrade to Premium")
-st.sidebar.markdown("[Pay ₹299 on Razorpay](https://rzp.io/rzp/HuxrI9w)")
-st.sidebar.caption("You will receive a premium access code via email.")
+
+st.sidebar.markdown(
+    "[Pay ₹299 on Razorpay](https://rzp.io/rzp/HuxrI9w)"
+)
+
+st.sidebar.caption("Your premium access code will be emailed automatically.")
 
 
-# ============================
-# MAIN CONTENT
-# ============================
+# ---------------------------------------------------
+# Main Header
+# ---------------------------------------------------
 st.title(APP_NAME)
 st.caption("Your multi-skill AI assistant powered by OpenAI + Streamlit.")
 
 
-# ----------------------------------
-# 1️⃣ General Chat
-# ----------------------------------
+# ---------------------------------------------------
+# TOOL 1 — General Chat
+# ---------------------------------------------------
 if mode == "General Chat":
     st.subheader("💬 Chat with AI")
 
-    user_msg = st.text_area("Enter message:")
+    user_msg = st.text_area("Type your message:")
 
     if st.button("Send"):
         if user_msg.strip():
             st.session_state.chat_history.append(("You", user_msg))
 
-            messages = [{"role": "system", "content": "You are a helpful AI."}]
-            for role, msg in st.session_state.chat_history:
-                messages.append(
-                    {"role": "user" if role == "You" else "assistant", "content": msg}
-                )
+            messages = [{"role": "system", "content": "You are a helpful AI assistant."}]
+            for speaker, msg in st.session_state.chat_history:
+                role = "user" if speaker == "You" else "assistant"
+                messages.append({"role": role, "content": msg})
 
             if can_use_ai():
                 try:
-                    res = client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=messages,
-                    )
-                    reply = res.choices[0].message.content
-                    register_request()
+                    reply = client.chat.completions.create(
+                        model="gpt-4o-mini", messages=messages
+                    ).choices[0].message.content
+
                     st.session_state.chat_history.append(("AI", reply))
+                    register_request()
+
                 except Exception as e:
                     st.error(e)
 
     st.write("---")
-    for role, msg in st.session_state.chat_history:
-        st.markdown(f"**{role}:** {msg}")
+    for speaker, msg in st.session_state.chat_history:
+        st.markdown(f"**{speaker}:** {msg}")
 
 
-# ----------------------------------
-# 2️⃣ Resume Maker
-# ----------------------------------
+# ---------------------------------------------------
+# TOOL 2 — Resume & Cover Letter
+# ---------------------------------------------------
 elif mode == "Resume & Cover Letter":
-    st.subheader("📄 Resume & Cover Letter")
+    st.subheader("📄 Resume & Cover Letter Builder")
 
-    name = st.text_input("Name")
+    name = st.text_input("Your Name")
     role = st.text_input("Job Role")
     skills = st.text_area("Skills")
-    exp = st.text_area("Experience")
     projects = st.text_area("Projects")
+    experience = st.text_area("Experience")
 
     if st.button("Generate"):
         prompt = f"""
-Create resume + cover letter.
+Create:
+1. A strong resume summary.
+2. 6 bullet points using skills/projects/experience.
+3. A professional cover letter.
 
 Name: {name}
 Role: {role}
 Skills: {skills}
-Experience: {exp}
 Projects: {projects}
+Experience: {experience}
 """
-        output = call_openai("You are HR expert.", prompt)
+        output = call_openai("You are an HR expert.", prompt)
         st.write(output)
 
 
-# ----------------------------------
-# 3️⃣ Blog Writer
-# ----------------------------------
-elif mode == "Blog / Social Post Writer":
+# ---------------------------------------------------
+# TOOL 3 — Blog Writer
+# ---------------------------------------------------
+elif mode == "Blog Writer":
     st.subheader("✍️ Blog Writer")
 
     topic = st.text_input("Topic")
+
     if st.button("Generate Blog"):
-        output = call_openai("You are blog expert.", f"Write a blog about {topic}")
+        output = call_openai("You are a blog expert.", f"Write a blog about: {topic}")
         st.write(output)
 
 
-# ----------------------------------
-# 4️⃣ Email Writer
-# ----------------------------------
+# ---------------------------------------------------
+# TOOL 4 — Email Writer
+# ---------------------------------------------------
 elif mode == "Email Writer":
-    st.subheader("📧 Email Writer")
+    st.subheader("📧 Professional Email Writer")
 
-    purpose = st.text_input("Purpose")
-    context = st.text_area("Context")
+    purpose = st.text_input("Email Purpose")
+    details = st.text_area("Details / Context")
 
     if st.button("Generate Email"):
         output = call_openai(
-            "You write professional emails.",
-            f"Purpose: {purpose}\nContext: {context}",
+            "You are an expert at writing clear professional emails.",
+            f"Write an email for the purpose: {purpose}\nDetails: {details}",
         )
         st.write(output)
 
 
-# ----------------------------------
-# 5️⃣ Code Helper
-# ----------------------------------
+# ---------------------------------------------------
+# TOOL 5 — Code Helper
+# ---------------------------------------------------
 elif mode == "Code Helper":
     st.subheader("💻 Code Helper")
 
-    code_text = st.text_area("Paste your code")
+    code_text = st.text_area("Paste your code here")
 
     if st.button("Explain Code"):
-        output = call_openai("You are a senior developer.", f"Explain:\n{code_text}")
+        output = call_openai(
+            "You are a senior software engineer.",
+            f"Explain this code clearly:\n{code_text}",
+        )
         st.write(output)
