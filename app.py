@@ -8,7 +8,7 @@ from openai import OpenAI
 load_dotenv()
 
 st.set_page_config(page_title="SuperBrain AI", layout="wide")
-
+st.image("/mnt/data/Super Brain.png", width=160)
 api_key = os.getenv("OPENAI_API_KEY", "")
 
 # ---------- Error if no API key ----------
@@ -291,3 +291,4 @@ elif mode == "Code Helper":
     if st.button("Explain Code"):
         output = call_openai("You are senior developer.", f"Explain this code:\n{code_text}")
         st.write(output)
+
