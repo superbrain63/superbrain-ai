@@ -51,12 +51,11 @@ if "show_premium_popup" not in st.session_state:
 if "mode" not in st.session_state:
     st.session_state.mode = "General Chat"
 
+APP_NAME = "SuperBrain AI"
+
 # -------------------------
 # Helper functions
 # -------------------------
-APP_NAME = "SuperBrain AI"
-
-
 def can_use_ai() -> bool:
     """Check if the user is allowed to make another request."""
     if st.session_state.is_premium:
@@ -106,6 +105,12 @@ def add_chat_message(role: str, content: str) -> None:
 st.markdown(
     """
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        html, body, [class*="css"] {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
         /* Center top logo */
         .logo-container {
             display: flex;
@@ -132,12 +137,12 @@ st.markdown(
         .premium-badge-pro {
             background: linear-gradient(90deg, #4f46e5, #9333ea);
             color: white;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 14px rgba(79,70,229,0.6);
         }
 
-        /* Chat bubbles */
+        /* SuperBrain Signature Chat Bubbles (A: gradient glow) */
         .chat-bubble-user {
-            background: #2563eb;
+            background: linear-gradient(135deg, #38bdf8, #4f46e5);
             color: white;
             padding: 0.7rem 0.9rem;
             border-radius: 16px 16px 4px 16px;
@@ -145,16 +150,18 @@ st.markdown(
             max-width: 80%;
             margin-left: auto;
             font-size: 0.95rem;
+            box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
         }
         .chat-bubble-ai {
-            background: #f3f4f6;
-            color: #111827;
+            background: linear-gradient(135deg, #8b5cf6, #0ea5e9);
+            color: #f9fafb;
             padding: 0.7rem 0.9rem;
             border-radius: 16px 16px 16px 4px;
             margin-bottom: 0.4rem;
             max-width: 80%;
             margin-right: auto;
             font-size: 0.95rem;
+            box-shadow: 0 0 14px rgba(139, 92, 246, 0.45);
         }
         .chat-label {
             font-size: 0.75rem;
@@ -168,11 +175,21 @@ st.markdown(
             text-align: left;
         }
 
+        /* Scrollable chat container */
+        #chat-container {
+            max-height: 420px;
+            overflow-y: auto;
+            padding-right: 10px;
+            padding-left: 2px;
+            padding-top: 4px;
+            padding-bottom: 4px;
+        }
+
         /* Premium popup card */
         .premium-popup {
             border-radius: 18px;
             padding: 1.2rem 1.4rem;
-            background: linear-gradient(135deg, #0f172a, #111827);
+            background: linear-gradient(135deg, #0f172a, #020617);
             color: #e5e7eb;
             box-shadow: 0 18px 40px rgba(15,23,42,0.7);
             border: 1px solid #4f46e5;
@@ -184,6 +201,11 @@ st.markdown(
             border-radius: 14px;
             background: #f9fafb;
             border: 1px solid #e5e7eb;
+        }
+
+        /* Floating-ish input look (pill style) */
+        textarea {
+            border-radius: 999px !important;
         }
     </style>
     """,
@@ -202,7 +224,7 @@ if theme_choice == "Dark":
         <style>
         .stApp { background-color: #020617; color: #e5e7eb; }
         .metric-card { background: #020617; border-color: #1f2937; }
-        .chat-bubble-ai { background: #111827; color: #e5e7eb; }
+        #chat-container { border-color: #111827; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -271,7 +293,6 @@ else:
 # Resolve logo path safely
 logo_path = "superbrain_logo.png"
 if not os.path.exists(logo_path):
-    # backup name used earlier
     if os.path.exists("SuperBrain.png"):
         logo_path = "SuperBrain.png"
     else:
@@ -335,39 +356,18 @@ st.write("---")
 # MAIN MODES
 # -------------------------
 
-# 1) GENERAL CHAT
+# 1) GENERAL CHAT — ChatGPT-style (history on top, input at bottom)
 if mode == "General Chat":
-    st.subheader("💬 Chat with AI")
+    st.subheader("💬 Chat with SuperBrain")
 
-    user_message = st.text_area("Type your message:", key="general_chat_box")
-    send_clicked = st.button("Send")
+    # Scrollable chat history
+    st.markdown(
+        "<div id='chat-container'>",
+        unsafe_allow_html=True,
+    )
 
-    if send_clicked and user_message.strip():
-        add_chat_message("user", user_message)
-
-        # Build messages with history
-        messages = [
-            {"role": "system", "content": "You are a helpful, friendly AI assistant named SuperBrain."}
-        ]
-        for m in st.session_state.chat_history:
-            messages.append({"role": m["role"], "content": m["content"]})
-
-        if can_use_ai():
-            try:
-                res = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=messages,
-                )
-                reply = res.choices[0].message.content
-                register_request()
-                add_chat_message("assistant", reply)
-            except Exception as e:
-                st.error(f"Error talking to model: {e}")
-
-    # Chat bubble display
-    st.markdown("#### Conversation")
     if not st.session_state.chat_history:
-        st.info("Start chatting by typing a message above.")
+        st.info("Start the conversation by typing a message below.")
     else:
         for m in st.session_state.chat_history:
             role = m["role"]
@@ -390,6 +390,54 @@ if mode == "General Chat":
                     f'<div class="chat-bubble-ai">{content}</div>',
                     unsafe_allow_html=True,
                 )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Auto-scroll to bottom of chat container
+    st.markdown(
+        """
+        <script>
+        const chatContainer = document.getElementById('chat-container');
+        if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.write("")  # small spacer
+
+    # Input at the bottom (ChatGPT-style)
+    with st.container():
+        user_message = st.text_area("Type your message:", key="general_chat_box", height=80)
+        send_clicked = st.button("Send")
+
+    if send_clicked and user_message.strip():
+        # Add user message
+        add_chat_message("user", user_message)
+
+        # Build messages with history
+        messages = [
+            {"role": "system", "content": "You are a helpful, friendly AI assistant named SuperBrain."}
+        ]
+        for m in st.session_state.chat_history:
+            messages.append({"role": m["role"], "content": m["content"]})
+
+        if can_use_ai():
+            try:
+                res = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=messages,
+                )
+                reply = res.choices[0].message.content
+                register_request()
+                add_chat_message("assistant", reply)
+            except Exception as e:
+                st.error(f"Error talking to model: {e}")
+
+    # When button is clicked, Streamlit reruns;
+    # thanks to the script above, it will scroll to newest messages.
 
 # 2) RESUME & COVER LETTER
 elif mode == "Resume & Cover Letter":
