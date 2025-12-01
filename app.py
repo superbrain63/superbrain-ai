@@ -1,9 +1,21 @@
 import os
 from datetime import datetime
+from io import BytesIO
 
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
+from PIL import Image, ImageDraw, ImageFont
+import textwrap
+
+# Optional PDF support
+try:
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+
+    HAS_REPORTLAB = True
+except ImportError:
+    HAS_REPORTLAB = False
 
 # -------------------------
 # Load environment variables
@@ -99,6 +111,67 @@ def add_chat_message(role: str, content: str) -> None:
     st.session_state.chat_history.append({"role": role, "content": content})
 
 
+def build_transcript() -> str:
+    """Create a plain text transcript of the chat."""
+    if not st.session_state.chat_history:
+        return "No messages yet."
+    lines = []
+    for m in st.session_state.chat_history:
+        speaker = "You" if m["role"] == "user" else "SuperBrain AI"
+        lines.append(f"{speaker}: {m['content']}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def create_pdf_from_text(text: str) -> bytes | None:
+    """Create a PDF bytes object from text, if reportlab is available."""
+    if not HAS_REPORTLAB:
+        return None
+
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    x_margin, y_margin = 40, 40
+    y = height - y_margin
+
+    for line in text.splitlines():
+        wrapped_lines = textwrap.wrap(line, 90) or [""]
+        for wline in wrapped_lines:
+            c.drawString(x_margin, y, wline)
+            y -= 14
+            if y < y_margin:
+                c.showPage()
+                y = height - y_margin
+
+    c.save()
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes
+
+
+def create_jpg_from_text(text: str) -> bytes:
+    """Create a simple JPG image containing the chat transcript."""
+    lines = text.splitlines() or [""]
+    max_line_len = max(len(line) for line in lines)
+    char_w, char_h = 7, 14
+
+    width = min(max_line_len * char_w + 40, 2000)
+    height = min(len(lines) * (char_h + 4) + 40, 4000)
+
+    img = Image.new("RGB", (max(width, 200), max(height, 100)), "white")
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.load_default()
+
+    y = 20
+    for line in lines:
+        draw.text((20, y), line, fill="black", font=font)
+        y += char_h + 4
+
+    buf = BytesIO()
+    img.save(buf, format="JPEG")
+    return buf.getvalue()
+
+
 # -------------------------
 # Global styles (chat bubbles, etc.)
 # -------------------------
@@ -173,6 +246,35 @@ st.markdown(
         }
         .chat-label-ai {
             text-align: left;
+        }
+
+        /* Typing indicator dots */
+        .typing-bubble {
+            background: linear-gradient(135deg, #8b5cf6, #0ea5e9);
+            color: #f9fafb;
+            padding: 0.7rem 0.9rem;
+            border-radius: 16px 16px 16px 4px;
+            margin-bottom: 0.4rem;
+            max-width: 120px;
+            margin-right: auto;
+            font-size: 0.95rem;
+            box-shadow: 0 0 14px rgba(139, 92, 246, 0.45);
+        }
+        .typing-dots span {
+            display: inline-block;
+            font-size: 1.2rem;
+            animation: blink 1.4s infinite both;
+        }
+        .typing-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes blink {
+            0% { opacity: .2; }
+            20% { opacity: 1; }
+            100% { opacity: .2; }
         }
 
         /* Scrollable chat container */
@@ -360,7 +462,23 @@ st.write("---")
 if mode == "General Chat":
     st.subheader("💬 Chat with SuperBrain")
 
-    # Scrollable chat history
+    # Optional: file attachment for context
+    uploaded_file = st.file_uploader(
+        "Attach a text/code file for SuperBrain to read (optional)",
+        type=["txt", "md", "py", "csv", "json"],
+        key="chat_file_uploader",
+    )
+    attached_text = ""
+    attached_name = ""
+    if uploaded_file is not None:
+        try:
+            attached_text = uploaded_file.read().decode("utf-8", errors="ignore")
+            attached_name = uploaded_file.name
+        except Exception:
+            attached_text = ""
+            attached_name = ""
+
+    # Scrollable chat history container
     st.markdown(
         "<div id='chat-container'>",
         unsafe_allow_html=True,
@@ -393,6 +511,9 @@ if mode == "General Chat":
 
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # Placeholder for typing indicator (above next AI message)
+    typing_placeholder = st.empty()
+
     # Auto-scroll to bottom of chat container
     st.markdown(
         """
@@ -411,15 +532,84 @@ if mode == "General Chat":
     # Input at the bottom (ChatGPT-style)
     with st.container():
         user_message = st.text_area("Type your message:", key="general_chat_box", height=80)
-        send_clicked = st.button("Send")
+        col_input = st.columns([1, 1, 1, 1])
+        send_clicked = col_input[0].button("Send")
+        clear_clicked = col_input[1].button("Clear Chat")
+        # download buttons in same footer row
+        has_history = bool(st.session_state.chat_history)
 
+        if has_history:
+            transcript = build_transcript()
+
+            txt_data = transcript.encode("utf-8")
+            col_input[2].download_button(
+                "⬇️ TXT",
+                data=txt_data,
+                file_name="superbrain_chat.txt",
+                mime="text/plain",
+            )
+
+            # For PDF, only if reportlab installed
+            if HAS_REPORTLAB:
+                pdf_bytes = create_pdf_from_text(transcript)
+                if pdf_bytes:
+                    col_input[3].download_button(
+                        "⬇️ PDF",
+                        data=pdf_bytes,
+                        file_name="superbrain_chat.pdf",
+                        mime="application/pdf",
+                    )
+            else:
+                col_input[3].markdown(
+                    "<small>PDF export needs `reportlab` installed.</small>",
+                    unsafe_allow_html=True,
+                )
+
+        # Clear chat action
+        if clear_clicked:
+            st.session_state.chat_history = []
+            st.experimental_rerun()
+
+    # Extra row for JPG export if history exists
+    if st.session_state.chat_history:
+        transcript = build_transcript()
+        jpg_bytes = create_jpg_from_text(transcript)
+        st.download_button(
+            "⬇️ JPG (chat snapshot)",
+            data=jpg_bytes,
+            file_name="superbrain_chat.jpg",
+            mime="image/jpeg",
+        )
+
+    # Handle sending message + typing indicator
     if send_clicked and user_message.strip():
-        # Add user message
-        add_chat_message("user", user_message)
+        # Merge attachment into user message if any
+        full_user_message = user_message
+        if attached_text:
+            full_user_message += f"\n\n[Attached file: {attached_name}]\n{attached_text[:4000]}"
 
-        # Build messages with history
+        add_chat_message("user", full_user_message)
+
+        # Show typing indicator bubble above the upcoming AI message
+        with typing_placeholder:
+            st.markdown(
+                """
+                <div class="chat-label chat-label-ai">SuperBrain AI</div>
+                <div class="typing-bubble">
+                    <span class="typing-dots">
+                        <span>.</span><span>.</span><span>.</span>
+                    </span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        # Build messages with history (including new user message)
         messages = [
-            {"role": "system", "content": "You are a helpful, friendly AI assistant named SuperBrain."}
+            {
+                "role": "system",
+                "content": "You are a helpful, friendly AI assistant named SuperBrain.",
+            }
         ]
         for m in st.session_state.chat_history:
             messages.append({"role": m["role"], "content": m["content"]})
@@ -435,9 +625,8 @@ if mode == "General Chat":
                 add_chat_message("assistant", reply)
             except Exception as e:
                 st.error(f"Error talking to model: {e}")
-
-    # When button is clicked, Streamlit reruns;
-    # thanks to the script above, it will scroll to newest messages.
+            finally:
+                typing_placeholder.empty()
 
 # 2) RESUME & COVER LETTER
 elif mode == "Resume & Cover Letter":
